@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f6f6f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #d32f2f; margin: 0; font-size: 24px; }
+        .content { font-size: 16px; line-height: 1.6; }
+        .ticket-box { background: #fff5f5; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #d32f2f; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Event Cancelled Notice</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ user.full_name }},</p>
+            <p>We are very sorry to inform you that the event <strong>{{ event.title }}</strong> scheduled for {{ event.start_datetime.strftime('%B %d, %Y') }} has been officially cancelled by the organizers.</p>
+            
+            <div class="ticket-box">
+                <p>We have automatically triggered a full refund for your booking (<strong>{{ booking.id }}</strong>). The funds will be returned to your original payment method.</p>
+            </div>
+            
+            <p>Please allow <strong>5-10 business days</strong> for the transaction to complete. We apologize for any inconvenience this may cause and hope to see you at another event soon.</p>
+        </div>
+        <div class="footer">
+            <p>If you have any questions, please contact our support team.</p>
+            <p><a href="{{ frontend_url }}/unsubscribe?user_id={{ user.id }}">Unsubscribe from these alerts</a></p>
+        </div>
+    </div>
+</body>
+</html>

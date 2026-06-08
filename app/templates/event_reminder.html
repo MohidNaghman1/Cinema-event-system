@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f6f6f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .header { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #222; margin: 0; font-size: 24px; }
+        .content { font-size: 16px; line-height: 1.6; }
+        .ticket-box { background: #e3f2fd; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #2196f3; }
+        .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Event Reminder</h1>
+        </div>
+        <div class="content">
+            <p>Hi {{ user.full_name }},</p>
+            <p>This is a quick reminder that your event is happening tomorrow! We can't wait to see you there.</p>
+            
+            <div class="ticket-box">
+                <p><strong>Event:</strong> {{ event.title }}</p>
+                <p><strong>Date & Time:</strong> {{ event.start_datetime.strftime('%B %d, %Y at %H:%M') }}</p>
+                <p><strong>Venue:</strong> {{ venue.name }}</p>
+                <p><strong>Address:</strong> <a href="https://maps.google.com/?q={{ venue.address }}, {{ venue.city }}">{{ venue.address }}, {{ venue.city }}</a></p>
+            </div>
+            
+            <p>Don't forget to have your e-Ticket ready on your phone or printed out for quick scanning at the gate.</p>
+        </div>
+        <div class="footer">
+            <p><a href="{{ frontend_url }}/unsubscribe?user_id={{ user.id }}">Unsubscribe from these alerts</a></p>
+        </div>
+    </div>
+</body>
+</html>
