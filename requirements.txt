@@ -6,7 +6,7 @@ pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
 python-dotenv>=1.0,<2
 qrcode[pil] 
-weasyprint 
+reportlab 
 Jinja2
 stripe
 passlib
