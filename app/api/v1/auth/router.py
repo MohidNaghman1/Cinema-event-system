@@ -3,8 +3,7 @@ import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from slowapi import Limiter
-from slowapi.util import get_remote_address
+
 
 from app.core.security import decode_token, revoke_token
 from app.dependencies import get_user_repo
@@ -14,7 +13,6 @@ from app.schemas.user import UserCreate, UserRead
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"], responses={    401: {"description": "Unauthorized - Invalid or missing authentication token."},    403: {"description": "Forbidden - You do not have the required role permissions."},    422: {"description": "Unprocessable Entity - Schema validation error on the request payload."}})
-limiter = Limiter(key_func=get_remote_address)
 bearer_scheme = HTTPBearer()
 
 
@@ -38,6 +36,7 @@ async def login(
     data: LoginRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> Token:
+    
     user = await auth_service.authenticate_user(data.email, data.password)
     if not user:
         raise HTTPException(
