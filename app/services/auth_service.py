@@ -2,8 +2,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import BackgroundTasks, HTTPException, status
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 from app.core.security import (
     create_access_token,

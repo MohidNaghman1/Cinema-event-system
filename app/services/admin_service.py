@@ -2,8 +2,6 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException
-
-from app.core.security import redis_client
 from app.models.user import Role, User
 from app.repositories.booking_repo import BookingRepository
 from app.repositories.payment_repo import PaymentRepository
@@ -35,9 +33,6 @@ class AdminService:
         await self.user_repo.update(user_id, {"is_active": False})
         user_dict["is_active"] = False
 
-        # Revoke all active tokens by setting a global ban timestamp marker in Redis
-        await redis_client.set(f"banned_user:{user_id}", "true")
-
         print(f"[AUDIT] Admin {admin_id} banned user {user_id}")
 
         background_tasks.add_task(
@@ -55,8 +50,6 @@ class AdminService:
 
         await self.user_repo.update(user_id, {"is_active": True})
         user_dict["is_active"] = True
-
-        await redis_client.delete(f"banned_user:{user_id}")
 
         print(f"[AUDIT] Admin {admin_id} unbanned user {user_id}")
         return user_dict
@@ -96,11 +89,8 @@ class AdminService:
                 "email": anonymised_email,
                 "full_name": "Deleted User",
                 "phone": None,
-                "oauth_accounts": [],
             },
         )
-
-        await redis_client.set(f"banned_user:{user_id}", "true")
 
         print(f"[AUDIT] Admin {admin_id} deleted and anonymised user {user_id}")
 

@@ -1,8 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, ConfigDict
-
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from app.models.user import Role
 
 
@@ -13,11 +12,11 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(max_length=72)
+    profile_picture: Optional[str] = None
 
 
 class UserRead(UserBase):
-    id: UUID
     profile_picture: Optional[str] = None
     is_active: bool
     is_verified: bool

@@ -7,6 +7,14 @@ class MongoDB:
 
 db_client = MongoDB()
 
+from beanie import init_beanie
+
+from app.models.user import User
+from app.models.event import Event
+from app.models.venue import Venue
+from app.models.booking import Booking
+from app.models.payment import Payment
+
 async def connect_to_mongo() -> None:
     settings = get_settings()
     db_client.client = AsyncIOMotorClient(
@@ -18,8 +26,18 @@ async def connect_to_mongo() -> None:
     db_client.db = db_client.client[settings.mongo_db_name]
     try:
         await db_client.db.command("ping")
+        await init_beanie(
+            database=db_client.db,
+            document_models=[
+                User,
+                Event,
+                Venue,
+                Booking,
+                Payment
+            ]
+        )
     except Exception as e:
-        raise RuntimeError("Could not connect to MongoDB") from e
+        raise RuntimeError("Could not connect to MongoDB or initialize Beanie") from e
 
 async def close_mongo_connection() -> None:
     if db_client.client:
