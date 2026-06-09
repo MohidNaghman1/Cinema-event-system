@@ -9,5 +9,7 @@ qrcode[pil]
 reportlab 
 Jinja2
 stripe
-passlib
 python-jose[cryptography]
+httpx
+passlib[bcrypt]
+bcrypt==3.2.2
