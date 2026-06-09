@@ -1,19 +1,17 @@
 import datetime
-from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.core.security import decode_token, is_token_revoked, revoke_token, create_access_token, hash_password
+from app.core.security import decode_token, revoke_token
 from app.dependencies import get_user_repo
-from app.models.user import User
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import LoginRequest, Token
 from app.schemas.user import UserCreate, UserRead
-from app.services.auth_service import AuthService, send_password_reset_email
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"], responses={    401: {"description": "Unauthorized - Invalid or missing authentication token."},    403: {"description": "Forbidden - You do not have the required role permissions."},    422: {"description": "Unprocessable Entity - Schema validation error on the request payload."}})
 limiter = Limiter(key_func=get_remote_address)
@@ -63,25 +61,7 @@ async def refresh(
     data: RefreshRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> Token:
-    payload = decode_token(data.refresh_token)
-    jti = payload.get("jti")
-    sub = payload.get("sub")
-
-    if not jti or not sub:
-        raise HTTPException(status_code=401, detail="Invalid token format")
-
-    if await is_token_revoked(jti):
-        raise HTTPException(status_code=401, detail="Refresh token has been revoked")
-
-    user_dict = await auth_service.user_repo.get_by_id(sub)
-    if not user_dict:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    user = User(**user_dict)
-    if not user.is_active:
-        raise HTTPException(status_code=401, detail="Inactive user")
-
-    return auth_service.issue_tokens(user)
+    return await auth_service.refresh_access_token(data.refresh_token)
 
 
 class LogoutRequest(BaseModel):
@@ -121,50 +101,30 @@ async def logout(
     return {"detail": "Logged out successfully"}
 
 
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
 @router.post("/verify-email")
 async def verify_email(
-    token: str,
+    data: VerifyEmailRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict[str, str]:
-    payload = decode_token(token)
-    if payload.get("type") != "verify_email":
-        raise HTTPException(status_code=400, detail="Invalid token type")
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid token payload")
-
-    user_dict = await auth_service.user_repo.get_by_id(user_id)
-    if not user_dict:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user = User(**user_dict)
-    if user.is_verified:
-        return {"detail": "Email already verified"}
-
-    await auth_service.user_repo.update(user_id, {"is_verified": True})
+    await auth_service.verify_email(data.token)
     return {"detail": "Email verified successfully"}
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    email: str
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(
     data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict[str, str]:
-    user_dict = await auth_service.user_repo.get_by_email(data.email)
-    if user_dict:
-        user = User(**user_dict)
-        reset_token = create_access_token(
-            {"sub": str(user.id), "type": "reset_password"},
-            expires_delta=datetime.timedelta(minutes=15),
-        )
-        background_tasks.add_task(send_password_reset_email, user.email, reset_token)
-
+    await auth_service.request_password_reset(data.email, background_tasks)
     return {"detail": "If the email is registered, a password reset link has been sent."}
 
 
@@ -178,30 +138,7 @@ async def reset_password(
     data: ResetPasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> dict[str, str]:
-    payload = decode_token(data.token)
-    if payload.get("type") != "reset_password":
-        raise HTTPException(status_code=400, detail="Invalid token type")
-
-    user_id = payload.get("sub")
-    jti = payload.get("jti")
-    
-    if not user_id or not jti:
-        raise HTTPException(status_code=400, detail="Invalid token payload")
-
-    if await is_token_revoked(jti):
-        raise HTTPException(status_code=400, detail="Token has already been used")
-
-    hashed_password = hash_password(data.new_password)
-    await auth_service.user_repo.update(user_id, {"hashed_password": hashed_password})
-
-    # Revoke the reset token so it can't be reused
-    exp = payload.get("exp")
-    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
-    if exp:
-        ttl = int(exp - now)
-        if ttl > 0:
-            await revoke_token(jti, ttl)
-
+    await auth_service.reset_password(data.token, data.new_password)
     return {"detail": "Password reset successfully"}
 
 

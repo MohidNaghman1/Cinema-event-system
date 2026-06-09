@@ -20,9 +20,12 @@ class BaseRepository(Generic[T]):
         return id
 
     async def create(self, doc: T | dict[str, Any]) -> Any:
-        data = doc.model_dump(by_alias=True, exclude_unset=True) if hasattr(doc, "model_dump") else (doc.dict(by_alias=True, exclude_unset=True) if hasattr(doc, "dict") else doc)
-        result = await self.collection.insert_one(data)
-        return result.inserted_id
+        if isinstance(doc, Document):
+            await doc.insert()
+            return doc.id
+        else:
+            result = await self.collection.insert_one(doc)
+            return result.inserted_id
 
     async def get_by_id(self, id: str | ObjectId) -> dict[str, Any] | None:
         doc_id = self._get_object_id(id)

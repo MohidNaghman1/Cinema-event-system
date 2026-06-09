@@ -9,8 +9,8 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, database: AsyncIOMotorDatabase) -> None:
         super().__init__(model_class=User, database=database)
 
-    async def get_by_email(self, email: str) -> dict[str, Any] | None:
-        return await self.collection.find_one({"email": email})
+    async def get_by_email(self, email: str) -> User | None:
+        return await User.find_one(User.email == email)
 
     async def get_by_oauth(self, provider: str, provider_user_id: str) -> dict[str, Any] | None:
         return await self.collection.find_one({
