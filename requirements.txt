@@ -13,4 +13,4 @@ python-jose[cryptography]
 httpx
 passlib[bcrypt]
 bcrypt==3.2.2
-fastapi-mail
+aiosmtplib

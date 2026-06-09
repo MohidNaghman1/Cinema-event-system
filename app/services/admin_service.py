@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException
+from app.core.email import email_service
 from app.models.user import Role, User
 from app.repositories.booking_repo import BookingRepository
 from app.repositories.payment_repo import PaymentRepository
@@ -9,7 +10,8 @@ from app.repositories.user_repo import UserRepository
 
 
 async def send_notification_email(user_email: str, subject: str, message: str) -> None:
-    print(f"[BACKGROUND] Email to {user_email}: {subject} - {message}")
+    html_body = f"<p>{message}</p>"
+    await email_service.send_email(user_email, subject, html_body, message)
 
 
 class AdminService:

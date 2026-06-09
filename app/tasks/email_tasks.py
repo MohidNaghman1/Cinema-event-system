@@ -126,20 +126,3 @@ async def send_event_reminder_email(event_id: "UUID") -> None:
         plain_text = f"Reminder: {event.title} is happening soon!"
 
         await email_service.send_email(user.email, f"Reminder: {event.title}", html_body, plain_text)
-
-
-async def send_password_reset_email(user_id: "UUID", reset_token: str) -> None:
-    db = await _get_db()
-    user_repo = UserRepository(db)
-
-    user_dict = await user_repo.get_by_id(user_id)
-    if not user_dict:
-        return
-
-    user = User(**user_dict)
-    context = {"reset_token": reset_token}
-
-    html_body = email_service.render_template("password_reset.html", context)
-    plain_text = f"Password Reset Token: {reset_token}"
-
-    await email_service.send_email(user.email, "Password Reset Request", html_body, plain_text)

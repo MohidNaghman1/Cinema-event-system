@@ -17,8 +17,7 @@ from app.services.seat_service import SeatService
 from app.services.ticket_service import TicketService
 
 
-async def send_booking_confirmation_email(user_email: str, booking_id: UUID) -> None:
-    print(f"[BACKGROUND] Sending confirmation email to {user_email} for booking {booking_id}")
+from app.tasks.email_tasks import send_booking_confirmation_email
 
 
 class BookingService:
@@ -116,7 +115,7 @@ class BookingService:
         booking.payment_id = payment_id
 
         await self.ticket_service.generate_ticket(booking)
-        background_tasks.add_task(send_booking_confirmation_email, user_email, booking_id)
+        background_tasks.add_task(send_booking_confirmation_email, booking_id)
 
         return booking
 
