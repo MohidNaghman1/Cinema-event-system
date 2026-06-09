@@ -27,7 +27,6 @@ class OAuthAccount(BaseModel):
 
 
 class User(Document):
-    id: UUID = Field(default_factory=uuid4)
     email: str = Field(unique=True, index=True)
     hashed_password: Optional[str] = None
     full_name: str

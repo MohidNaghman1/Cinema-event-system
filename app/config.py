@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     facebook_app_secret: str | None = None
     linkedin_client_id: str | None = None
     linkedin_client_secret: str | None = None
-    oauth_redirect_base_url: str = "http://localhost:8000/api/v1/auth"
+    oauth_redirect_base_url: str = "http://localhost:8000/api/v1/auth/oauth"
     
     stripe_api_key: str | None = None
     stripe_webhook_secret: str | None = None

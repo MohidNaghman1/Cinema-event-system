@@ -203,3 +203,31 @@ async def reset_password(
             await revoke_token(jti, ttl)
 
     return {"detail": "Password reset successfully"}
+
+
+from app.services.oauth_service import OAuthService
+from app.models.user import OAuthProvider
+
+def get_oauth_service(user_repo: UserRepository = Depends(get_user_repo)) -> OAuthService:
+    return OAuthService(user_repo)
+
+@router.get("/oauth/{provider}/url")
+async def get_oauth_url(
+    provider: OAuthProvider,
+    oauth_service: OAuthService = Depends(get_oauth_service),
+) -> dict[str, str]:
+    """Returns the authorization URL for the requested provider."""
+    url = oauth_service.get_authorization_url(provider)
+    return {"url": url}
+
+@router.get("/oauth/{provider}/callback", response_model=Token)
+async def oauth_callback(
+    provider: OAuthProvider,
+    code: str,
+    oauth_service: OAuthService = Depends(get_oauth_service),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> Token:
+    """Exchanges the code for tokens and logs the user in."""
+    profile = await oauth_service.exchange_code_for_user_info(provider, code)
+    user = await oauth_service.upsert_oauth_user(profile)
+    return auth_service.issue_tokens(user)

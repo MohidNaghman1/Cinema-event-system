@@ -89,16 +89,13 @@ Welcome to the core backend for our Cinema & Concert management system.
 Most endpoints require a `Bearer` token.
 Use the `/api/v1/auth/login` endpoint to acquire an access token, or use the integrated Google/GitHub OAuth flows.
 
-### Rate Limits
-* Currently running without rate limits in development mode.
 """
 
 tags_metadata = [
-    {"name": "Auth", "description": "Authentication and authorization flows."},
+    {"name": "Authentication", "description": "Authentication and authorization flows."},
     {"name": "Venues", "description": "Venue management and seat map schemas."},
     {"name": "Events", "description": "Public event catalogs and details."},
-    {"name": "Seats", "description": "Concurrent seat locking and reservations."},
-    {"name": "Bookings", "description": "User booking lifecycle management."},
+    {"name": "Bookings", "description": "User booking lifecycle management and concurrent seat locking."},
     {"name": "Tickets", "description": "PDF and QR code generation for digital tickets."},
     {"name": "Payments", "description": "Stripe payment intents and webhooks."},
     {"name": "Admin — Users", "description": "User administration and bans."},

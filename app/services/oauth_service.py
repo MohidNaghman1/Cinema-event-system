@@ -1,138 +1,186 @@
+import urllib.parse
 from typing import Any
 
-from authlib.integrations.starlette_client import OAuth
-from fastapi import HTTPException, status
+import httpx
+from fastapi import HTTPException
 
 from app.config import get_settings
 from app.models.user import OAuthAccount, OAuthProvider, User
 from app.repositories.user_repo import UserRepository
-from app.services.auth_service import AuthService
 
 settings = get_settings()
-oauth = OAuth()
 
-if settings.google_client_id and settings.google_client_secret:
-    oauth.register(
-        name='google',
-        client_id=settings.google_client_id,
-        client_secret=settings.google_client_secret,
-        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-        client_kwargs={'scope': 'openid email profile'}
-    )
-
-if settings.github_client_id and settings.github_client_secret:
-    oauth.register(
-        name='github',
-        client_id=settings.github_client_id,
-        client_secret=settings.github_client_secret,
-        access_token_url='https://github.com/login/oauth/access_token',
-        authorize_url='https://github.com/login/oauth/authorize',
-        api_base_url='https://api.github.com/',
-        client_kwargs={'scope': 'user:email read:user'}
-    )
-
-if settings.facebook_app_id and settings.facebook_app_secret:
-    oauth.register(
-        name='facebook',
-        client_id=settings.facebook_app_id,
-        client_secret=settings.facebook_app_secret,
-        access_token_url='https://graph.facebook.com/v15.0/oauth/access_token',
-        authorize_url='https://www.facebook.com/v15.0/dialog/oauth',
-        api_base_url='https://graph.facebook.com/v15.0/',
-        client_kwargs={'scope': 'email public_profile'}
-    )
-
-if settings.linkedin_client_id and settings.linkedin_client_secret:
-    oauth.register(
-        name='linkedin',
-        client_id=settings.linkedin_client_id,
-        client_secret=settings.linkedin_client_secret,
-        access_token_url='https://www.linkedin.com/oauth/v2/accessToken',
-        authorize_url='https://www.linkedin.com/oauth/v2/authorization',
-        api_base_url='https://api.linkedin.com/v2/',
-        client_kwargs={'scope': 'r_liteprofile r_emailaddress'}
-    )
+OAUTH_CONFIGS = {
+    OAuthProvider.google: {
+        "auth_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "scope": "openid email profile",
+    },
+    OAuthProvider.github: {
+        "auth_url": "https://github.com/login/oauth/authorize",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "userinfo_url": "https://api.github.com/user",
+        "client_id": settings.github_client_id,
+        "client_secret": settings.github_client_secret,
+        "scope": "user:email",
+    },
+    OAuthProvider.linkedin: {
+        "auth_url": "https://www.linkedin.com/oauth/v2/authorization",
+        "token_url": "https://www.linkedin.com/oauth/v2/accessToken",
+        "userinfo_url": "https://api.linkedin.com/v2/userinfo",
+        "client_id": settings.linkedin_client_id,
+        "client_secret": settings.linkedin_client_secret,
+        "scope": "openid profile email",
+    },
+    OAuthProvider.facebook: {
+        "auth_url": "https://www.facebook.com/v25.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
+        "userinfo_url": "https://graph.facebook.com/me",
+        "client_id": settings.facebook_app_id,
+        "client_secret": settings.facebook_app_secret,
+        "scope": "public_profile email",
+    },
+}
 
 
 class OAuthService:
-    def __init__(self, user_repo: UserRepository, auth_service: AuthService) -> None:
+    def __init__(self, user_repo: UserRepository) -> None:
         self.user_repo = user_repo
-        self.auth_service = auth_service
 
-    async def get_user_profile(self, provider: str, token: dict[str, Any]) -> dict[str, Any]:
-        client = oauth.create_client(provider)
-        if not client:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Provider {provider} not supported")
+    def get_authorization_url(self, provider: OAuthProvider) -> str:
+        config = OAUTH_CONFIGS.get(provider)
+       
+        if not config or not config["client_id"]:
+            raise HTTPException(status_code=400, detail=f"{provider.value} OAuth is not configured")
+
+        redirect_uri = f"{settings.oauth_redirect_base_url}/{provider.value}/callback"
+
+        params = {
+            "client_id": config["client_id"],
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": config["scope"],
+        }
+
+        if provider == OAuthProvider.google:
+            params["access_type"] = "offline"
+            params["prompt"] = "consent"
+
+        query = urllib.parse.urlencode(params)
+        return f"{config['auth_url']}?{query}"
+
+    async def exchange_code_for_user_info(self, provider: OAuthProvider, code: str) -> dict[str, Any]:
+        config = OAUTH_CONFIGS.get(provider)
+        if not config or not config["client_id"]:
+            raise HTTPException(status_code=400, detail=f"{provider.value} OAuth is not configured")
+
+        redirect_uri = f"{settings.oauth_redirect_base_url}/{provider.value}/callback"
+
+        async with httpx.AsyncClient() as client:
+            # 1. Exchange code for access token
+            data = {
+                "code": code,
+                "client_id": config["client_id"],
+                "client_secret": config["client_secret"],
+                "redirect_uri": redirect_uri,
+            }
+
+            if provider in (OAuthProvider.google, OAuthProvider.linkedin):
+                data["grant_type"] = "authorization_code"
+
+            headers = {"Accept": "application/json"}
             
-        profile: dict[str, Any] = {}
-        if provider == 'google':
-            resp = await client.get('https://openidconnect.googleapis.com/v1/userinfo', token=token)
-            data = resp.json()
-            profile = {
-                'provider_user_id': data.get('sub'),
-                'email': data.get('email'),
-                'full_name': data.get('name'),
-                'profile_picture': data.get('picture')
+            if provider == OAuthProvider.facebook:
+                token_response = await client.get(config["token_url"], params=data)
+            elif provider == OAuthProvider.linkedin:
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+                token_response = await client.post(config["token_url"], data=data, headers=headers)
+            else:
+                token_response = await client.post(config["token_url"], data=data, headers=headers)
+
+            if token_response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to exchange code: {token_response.text}")
+
+            token_data = token_response.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                raise HTTPException(status_code=400, detail="Failed to parse access token")
+
+            # 2. Fetch user info
+            userinfo_headers = {
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": "cinema-event-system",
+                "Accept": "application/vnd.github.v3+json" if provider == OAuthProvider.github else "application/json"
             }
-        elif provider == 'github':
-            resp = await client.get('user', token=token)
-            data = resp.json()
-            email = data.get('email')
-            if not email:
-                emails_resp = await client.get('user/emails', token=token)
-                emails_data = emails_resp.json()
-                for e in emails_data:
-                    if e.get('primary') and e.get('verified'):
-                        email = e.get('email')
-                        break
-            profile = {
-                'provider_user_id': str(data.get('id')),
-                'email': email,
-                'full_name': data.get('name') or data.get('login'),
-                'profile_picture': data.get('avatar_url')
-            }
-        elif provider == 'facebook':
-            resp = await client.get('me?fields=id,name,email,picture', token=token)
-            data = resp.json()
-            profile = {
-                'provider_user_id': data.get('id'),
-                'email': data.get('email'),
-                'full_name': data.get('name'),
-                'profile_picture': data.get('picture', {}).get('data', {}).get('url')
-            }
-        elif provider == 'linkedin':
-            resp = await client.get('me', token=token)
-            data = resp.json()
-            email_resp = await client.get('emailAddress?q=members&projection=(elements*(handle~))', token=token)
-            email_data = email_resp.json()
             
-            email = None
-            if email_data.get('elements'):
-                email = email_data['elements'][0].get('handle~', {}).get('emailAddress')
+            if provider == OAuthProvider.facebook:
+                userinfo_response = await client.get(
+                    config["userinfo_url"],
+                    params={"fields": "id,name,first_name,last_name,email", "access_token": access_token}
+                )
+            else:
+                userinfo_response = await client.get(config["userinfo_url"], headers=userinfo_headers)
                 
-            first_name = data.get('localizedFirstName', '')
-            last_name = data.get('localizedLastName', '')
-            
-            profile = {
-                'provider_user_id': data.get('id'),
-                'email': email,
-                'full_name': f"{first_name} {last_name}".strip(),
-                'profile_picture': None
-            }
-            
-        if not profile.get('email'):
-            raise HTTPException(status_code=400, detail="Could not retrieve email from OAuth provider")
-            
-        return profile
 
-    async def upsert_oauth_user(self, provider: str, profile: dict[str, Any], access_token: str) -> User:
+            if userinfo_response.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Failed to fetch user info: {userinfo_response.text}")
+
+            userinfo = userinfo_response.json()
+
+            if provider == OAuthProvider.google:
+                name = userinfo.get("name")
+                provider_id = userinfo.get("id", userinfo.get("sub"))
+            elif provider == OAuthProvider.github:
+                name = userinfo.get("name") or userinfo.get("login")
+                provider_id = str(userinfo.get("id"))
+            elif provider == OAuthProvider.linkedin:
+                name = userinfo.get("name")
+                provider_id = userinfo.get("sub")
+            elif provider == OAuthProvider.facebook:
+                name = userinfo.get("name")
+                provider_id = userinfo.get("id")
+            else:
+                name = "OAuth User"
+                provider_id = "unknown"
+
+            # Normalize user info mapping
+            email = userinfo.get("email")
+            
+            if provider == OAuthProvider.github and not email:
+                emails_response = await client.get("https://api.github.com/user/emails", headers=userinfo_headers)
+                if emails_response.status_code == 200:
+                    emails = emails_response.json()
+                    primary = next((e for e in emails if e.get("primary")), None)
+                    if primary:
+                        email = primary.get("email")
+                        
+            if not email:
+                if provider == OAuthProvider.github:
+                    email = f"{provider_id}@github.local"
+                else:
+                    raise HTTPException(status_code=400, detail=f"No email provided by {provider.value}")
+
+            return {
+                "email": email,
+                "name": name,
+                "provider": provider,
+                "provider_user_id": provider_id,
+                "access_token": access_token
+            }
+
+    async def upsert_oauth_user(self, profile: dict[str, Any]) -> User:
         email = profile['email']
         provider_user_id = profile['provider_user_id']
+        provider = profile['provider']
+        access_token = profile['access_token']
         
         user_dict = await self.user_repo.get_by_email(email)
         
         oauth_account = OAuthAccount(
-            provider=OAuthProvider(provider),
+            provider=provider,
             provider_user_id=provider_user_id,
             access_token=access_token
         )
@@ -154,8 +202,7 @@ class OAuthService:
         else:
             user = User(
                 email=email,
-                full_name=profile['full_name'] or email.split('@')[0],
-                profile_picture=profile['profile_picture'],
+                full_name=profile['name'] or email.split('@')[0],
                 is_verified=True,
                 oauth_accounts=[oauth_account]
             )

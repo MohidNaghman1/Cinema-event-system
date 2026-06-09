@@ -7,11 +7,9 @@ class Token(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "description": "Standard Example Payload",
-                    "email": "user@example.com",
-                    "name": "Main Arena",
-                    "title": "Summer Festival",
-                    "amount": 99.99
+                    "access_token": "eyJhb...",
+                    "refresh_token": "eyJhb...",
+                    "token_type": "bearer"
                 }
             ]
         }
@@ -27,11 +25,8 @@ class LoginRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "description": "Standard Example Payload",
                     "email": "user@example.com",
-                    "name": "Main Arena",
-                    "title": "Summer Festival",
-                    "amount": 99.99
+                    "password": "securepassword123"
                 }
             ]
         }
@@ -46,11 +41,9 @@ class OAuthCallbackRequest(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "description": "Standard Example Payload",
-                    "email": "user@example.com",
-                    "name": "Main Arena",
-                    "title": "Summer Festival",
-                    "amount": 99.99
+                    "provider": "google",
+                    "code": "4/0AX4XfWh...",
+                    "redirect_uri": "http://localhost:3000/callback"
                 }
             ]
         }

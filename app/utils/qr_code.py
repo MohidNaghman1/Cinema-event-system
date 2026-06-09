@@ -1,7 +1,7 @@
 import io
 from datetime import datetime, timezone
 
-import jwt
+from jose import jwt
 import qrcode
 
 from app.config import get_settings

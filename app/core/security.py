@@ -15,6 +15,12 @@ _revoked_tokens: dict[str, float] = {}
 
 
 def hash_password(plain: str) -> str:
+    if not isinstance(plain, str):
+        raise ValueError("Password must be a string")
+
+    if len(plain.encode("utf-8")) > 72:
+        raise ValueError("Password too long for bcrypt (max 72 bytes)")
+
     return pwd_context.hash(plain)
 
 
