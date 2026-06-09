@@ -41,15 +41,15 @@ class Settings(BaseSettings):
     stripe_api_key: str | None = None
     stripe_webhook_secret: str | None = None
     
-    mail_provider: str = "SMTP"
+    mail_provider: str = "postmark"  
     email_host: str = "smtp.gmail.com"
     email_port: int = 587
     email_use_tls: bool = True
     email_host_user: str | None = None
     email_host_password: str | None = None
     sendgrid_api_key: str | None = None
+    postmark_api_token: str | None = None
     default_from_email: str = "noreply@cinema-events.com"
-    frontend_url: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(
         env_file=".env",

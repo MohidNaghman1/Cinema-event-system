@@ -45,6 +45,35 @@ class EmailService:
                     return False
                 await asyncio.sleep(2**attempt)
         return False
+    
+
+    async def _send_via_postmark(
+        self, to: str, subject: str, html_body: str, plain_text_fallback: str
+    ) -> None:
+        import httpx
+
+        if not self.settings.postmark_api_token:
+            logger.warning("Postmark token not configured. Simulating email send.")
+            return
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.postmarkapp.com/email",
+                headers={
+                    "X-Postmark-Server-Token": self.settings.postmark_api_token,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json={
+                    "From": self.settings.default_from_email,
+                    "To": to,
+                    "Subject": subject,
+                    "HtmlBody": html_body,
+                    "TextBody": plain_text_fallback or "Please enable HTML to view this email.",
+                    "MessageStream": "outbound",
+                },
+            )
+            response.raise_for_status()
 
     async def _send_via_smtp(
         self, to: str, subject: str, html_body: str, plain_text_fallback: str
