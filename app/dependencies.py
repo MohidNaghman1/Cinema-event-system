@@ -10,18 +10,13 @@ from app.core.security import decode_token, is_token_revoked
 from app.db.mongodb import get_database
 from app.models.user import User, Role
 from app.repositories.user_repo import UserRepository
+from app.db.mongodb import get_database
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-async def get_db(request: Request) -> AsyncIOMotorDatabase:
-    """Return the shared Motor database from app state."""
-    database = getattr(request.app.state, "mongo_db", None)
-    if database is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database is not available.",
-        )
-    return database
+
+def get_db() -> AsyncIOMotorDatabase:
+    return get_database()
 
 def get_user_repo(database: AsyncIOMotorDatabase = Depends(get_database)) -> UserRepository:
     return UserRepository(database)
